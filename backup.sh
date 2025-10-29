@@ -70,7 +70,10 @@ UPDATED=0
 CLONED=0
 
 # Process each repo
-while IFS= read -r clone_url; do
+echo "$REPOS" | while IFS= read -r clone_url; do
+    # Skip empty lines
+    [ -z "$clone_url" ] && continue
+
     # Extract repo name from URL
     repo_name=$(basename "$clone_url" .git)
     repo_path="$BACKUP_DIR/$repo_name"
@@ -83,25 +86,25 @@ while IFS= read -r clone_url; do
         log "🔄 Updating: $repo_name"
         if (cd "$repo_path" && git pull --quiet); then
             log "✅ Updated: $repo_name"
-            ((SUCCESS++))
-            ((UPDATED++))
+            SUCCESS=$((SUCCESS + 1))
+            UPDATED=$((UPDATED + 1))
         else
             log "❌ Failed to update: $repo_name"
-            ((FAILED++))
+            FAILED=$((FAILED + 1))
         fi
     else
         # Clone new repo
         log "📥 Cloning: $repo_name"
         if git clone --quiet "$auth_url" "$repo_path" 2>/dev/null; then
             log "✅ Cloned: $repo_name"
-            ((SUCCESS++))
-            ((CLONED++))
+            SUCCESS=$((SUCCESS + 1))
+            CLONED=$((CLONED + 1))
         else
             log "❌ Failed to clone: $repo_name"
-            ((FAILED++))
+            FAILED=$((FAILED + 1))
         fi
     fi
-done <<< "$REPOS"
+done
 
 # Summary
 log "📊 Backup completed: $SUCCESS success, $FAILED failed (Cloned: $CLONED, Updated: $UPDATED)"
