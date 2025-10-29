@@ -14,12 +14,17 @@ if [ ! -f "env.json" ]; then
     exit 1
 fi
 
-GITHUB_TOKEN=$(jq -r '.github_token' env.json)
-GITHUB_USERNAME=$(jq -r '.github_username' env.json)
-BACKUP_DIR=$(jq -r '.backup_dir' env.json)
-TELEGRAM_BOT_TOKEN=$(jq -r '.telegram_bot_token // ""' env.json)
-TELEGRAM_CHAT_ID=$(jq -r '.telegram_chat_id // ""' env.json)
-LOG_FILE=$(jq -r '.log_file' env.json)
+# Load config using Python (no jq dependency)
+read_json() {
+    python3 -c "import json; print(json.load(open('env.json')).get('$1', ''))"
+}
+
+GITHUB_TOKEN=$(read_json 'github_token')
+GITHUB_USERNAME=$(read_json 'github_username')
+BACKUP_DIR=$(read_json 'backup_dir')
+TELEGRAM_BOT_TOKEN=$(read_json 'telegram_bot_token')
+TELEGRAM_CHAT_ID=$(read_json 'telegram_chat_id')
+LOG_FILE=$(read_json 'log_file')
 
 # Create directories
 mkdir -p "$BACKUP_DIR"
@@ -48,7 +53,7 @@ telegram_notify "🚀 *GitBackup* started"
 log "📡 Fetching repositories for user: $GITHUB_USERNAME"
 REPOS=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
     "https://api.github.com/user/repos?per_page=100&affiliation=owner" \
-    | jq -r '.[].clone_url')
+    | python3 -c "import json, sys; [print(r['clone_url']) for r in json.load(sys.stdin)]")
 
 if [ -z "$REPOS" ]; then
     log "❌ No repositories found or API error"

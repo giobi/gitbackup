@@ -158,13 +158,10 @@ gitbackup/
 
 - `bash`
 - `git`
-- `jq` (JSON parser)
+- `python3` (JSON parsing)
 - `curl` (per GitHub API + Telegram notifications)
 
-Install su Debian/Ubuntu:
-```bash
-sudo apt install git jq curl
-```
+Già installato su tutti i sistemi moderni! Zero dipendenze extra.
 
 ## Cron Setup
 
