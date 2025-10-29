@@ -68,9 +68,18 @@ SUCCESS=0
 FAILED=0
 UPDATED=0
 CLONED=0
+TOTAL_SIZE=0
+MAX_SIZE=0
+MAX_SIZE_REPO=""
+STALE_REPOS=""
+LARGE_REPOS=""
 
-# Process each repo
-echo "$REPOS" | while IFS= read -r clone_url; do
+# Warning thresholds
+LARGE_REPO_THRESHOLD=$((500 * 1024))  # 500 MB in KB
+STALE_MONTHS=6
+
+# Process each repo - use process substitution to avoid subshell
+while IFS= read -r clone_url; do
     # Skip empty lines
     [ -z "$clone_url" ] && continue
 
@@ -102,19 +111,87 @@ echo "$REPOS" | while IFS= read -r clone_url; do
         else
             log "❌ Failed to clone: $repo_name"
             FAILED=$((FAILED + 1))
+            continue
         fi
     fi
-done
+
+    # Calculate repo size (in KB)
+    if [ -d "$repo_path" ]; then
+        repo_size=$(du -sk "$repo_path" 2>/dev/null | cut -f1)
+        TOTAL_SIZE=$((TOTAL_SIZE + repo_size))
+
+        # Track largest repo
+        if [ "$repo_size" -gt "$MAX_SIZE" ]; then
+            MAX_SIZE=$repo_size
+            MAX_SIZE_REPO="$repo_name"
+        fi
+
+        # Check if repo is large
+        if [ "$repo_size" -gt "$LARGE_REPO_THRESHOLD" ]; then
+            size_mb=$((repo_size / 1024))
+            LARGE_REPOS="${LARGE_REPOS}• $repo_name (${size_mb} MB)\n"
+        fi
+
+        # Check last commit date (stale repos)
+        last_commit_date=$(cd "$repo_path" && git log -1 --format=%ct 2>/dev/null || echo "0")
+        current_date=$(date +%s)
+        days_since=$((( current_date - last_commit_date ) / 86400))
+        months_since=$((days_since / 30))
+
+        if [ "$months_since" -ge "$STALE_MONTHS" ] && [ "$last_commit_date" != "0" ]; then
+            STALE_REPOS="${STALE_REPOS}• $repo_name (${months_since} months ago)\n"
+        fi
+    fi
+done < <(echo "$REPOS")
+
+# Calculate total size in human-readable format
+total_size_mb=$((TOTAL_SIZE / 1024))
+total_size_gb=$((total_size_mb / 1024))
+max_size_mb=$((MAX_SIZE / 1024))
+
+if [ $total_size_gb -gt 0 ]; then
+    total_size_human="${total_size_gb} GB"
+else
+    total_size_human="${total_size_mb} MB"
+fi
 
 # Summary
 log "📊 Backup completed: $SUCCESS success, $FAILED failed (Cloned: $CLONED, Updated: $UPDATED)"
-telegram_notify "✅ *GitBackup completed*
+log "💾 Total size: $total_size_human | Largest repo: $MAX_SIZE_REPO ($max_size_mb MB)"
+
+# Build Telegram message
+telegram_msg="✅ *GitBackup completed*
 
 📊 Summary:
 • Total repos: $TOTAL_REPOS
 • Cloned: $CLONED
 • Updated: $UPDATED
-• Failed: $FAILED"
+• Failed: $FAILED
+
+💾 Storage:
+• Total size: $total_size_human
+• Largest repo: $MAX_SIZE_REPO ($max_size_mb MB)"
+
+# Add warnings if any
+warnings=""
+if [ -n "$LARGE_REPOS" ]; then
+    log "⚠️  Large repos (>500 MB):"
+    echo -e "$LARGE_REPOS" | while read -r line; do
+        [ -n "$line" ] && log "   $line"
+    done
+    warnings="${warnings}\n\n⚠️ *Large repos (>500 MB):*\n${LARGE_REPOS}"
+fi
+
+if [ -n "$STALE_REPOS" ]; then
+    log "🕐 Stale repos (>6 months):"
+    echo -e "$STALE_REPOS" | while read -r line; do
+        [ -n "$line" ] && log "   $line"
+    done
+    warnings="${warnings}\n\n🕐 *Stale repos (>6 months):*\n${STALE_REPOS}"
+fi
+
+# Send Telegram notification with warnings
+telegram_notify "${telegram_msg}${warnings}"
 
 if [ $FAILED -gt 0 ]; then
     exit 1
