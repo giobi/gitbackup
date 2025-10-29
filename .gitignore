@@ -1,0 +1,5 @@
+env.json
+backup/
+logs/
+*.log
+.env
