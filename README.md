@@ -9,6 +9,9 @@ Sistema di backup automatico per tutte le repository GitHub di un utente.
 - 📝 Logging completo su file
 - ⚙️ Setup interattivo
 - 🔐 Token sicuro in env.json (non versionato)
+- 💾 **Storage tracking**: dimensione totale e repo più grande
+- ⚠️ **Large repos warning**: alert se repo > 500 MB
+- 🕐 **Stale repos detection**: repo non aggiornate da 6+ mesi
 
 ## Quick Start
 
