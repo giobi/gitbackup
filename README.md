@@ -69,7 +69,26 @@ Tutti i backup sono loggati in `logs/gitbackup.log`:
 [2025-10-29 21:00:03] 🔄 Updating: circus
 [2025-10-29 21:00:04] ✅ Updated: circus
 ...
-[2025-10-29 21:05:00] 📊 Backup completed: 25 success, 0 failed
+[2025-10-29 21:05:00] 📊 Backup completed: 25 success, 0 failed (Cloned: 5, Updated: 20)
+[2025-10-29 21:05:00] 💾 Total size: 2 GB | Largest repo: old-project (450 MB)
+[2025-10-29 21:05:01] ⚠️  Large repos (>500 MB):
+[2025-10-29 21:05:01]    • big-dataset (1200 MB)
+[2025-10-29 21:05:02] 🕐 Stale repos (>6 months):
+[2025-10-29 21:05:02]    • abandoned-project (14 months ago)
+```
+
+### Storage Tracking
+
+Il backup calcola automaticamente:
+- **Dimensione totale** di tutte le repo backuppate
+- **Repo più grande** (nome + dimensione)
+- **Warning per repo grandi** (> 500 MB)
+- **Stale repos** (ultimo commit > 6 mesi fa)
+
+Thresholds configurabili in `backup.sh`:
+```bash
+LARGE_REPO_THRESHOLD=$((500 * 1024))  # 500 MB in KB
+STALE_MONTHS=6
 ```
 
 ## Idee di Integrazione Avanzate
