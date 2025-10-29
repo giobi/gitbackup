@@ -78,7 +78,9 @@ LARGE_REPOS=""
 LARGE_REPO_THRESHOLD=$((500 * 1024))  # 500 MB in KB
 STALE_MONTHS=6
 
-# Process each repo - use process substitution to avoid subshell
+# Process each repo - use temp file to preserve variables
+TMPFILE=$(mktemp)
+echo "$REPOS" > "$TMPFILE"
 while IFS= read -r clone_url; do
     # Skip empty lines
     [ -z "$clone_url" ] && continue
@@ -142,7 +144,8 @@ while IFS= read -r clone_url; do
             STALE_REPOS="${STALE_REPOS}• $repo_name (${months_since} months ago)\n"
         fi
     fi
-done < <(echo "$REPOS")
+done < "$TMPFILE"
+rm -f "$TMPFILE"
 
 # Calculate total size in human-readable format
 total_size_mb=$((TOTAL_SIZE / 1024))
