@@ -15,8 +15,30 @@ Sistema di backup automatico per tutte le repository GitHub di un utente.
 
 ## Quick Start
 
+### Auto-installer (Recommended)
+
+**One-liner install**:
 ```bash
-cd /home/web/gitbackup
+curl -sSL https://raw.githubusercontent.com/giobi/gitbackup/main/install.sh | bash
+```
+
+Or download first:
+```bash
+curl -sSL https://raw.githubusercontent.com/giobi/gitbackup/main/install.sh -o install.sh
+bash install.sh
+```
+
+The installer will:
+1. Clone the repo to your chosen directory
+2. Run interactive setup (GitHub token + optional Telegram)
+3. Optionally configure cron for automatic backups
+4. Run first backup
+
+### Manual Install
+
+```bash
+git clone https://github.com/giobi/gitbackup.git
+cd gitbackup
 
 # 1. Setup (chiede GitHub token + opzionale Telegram)
 ./setup.sh
@@ -24,10 +46,10 @@ cd /home/web/gitbackup
 # 2. Esegui backup manuale
 ./backup.sh
 
-# 3. Aggiungi a crontab per backup automatico
+# 3. Aggiungi a crontab per backup automatico (già fatto da setup.sh)
 crontab -e
 # Aggiungi:
-# 0 2 * * * cd /home/web/gitbackup && ./backup.sh
+# 0 2 * * * cd /path/to/gitbackup && ./backup.sh
 ```
 
 ## Setup Interattivo
