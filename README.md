@@ -121,6 +121,24 @@ STALE_MONTHS=6
 - ✅ Clone + pull automatico
 - ✅ Setup interattivo
 
+### 🚀 Multi-Cloud Backup (In Progress)
+
+Sistema di backup ridondante su 3+ provider per disaster recovery.
+
+**Target Setup**:
+- Emisfera (server primario, già attivo)
+- Scaleway Stardust (€1.80/mese)
+- Hetzner CX22 (€3.49/mese)
+- Raspberry Pi locale (backlog)
+
+**Budget**: €200/anno → Costo ~€63/anno
+
+**Docs**: `brain/database/projects/multi-cloud-backup.md`
+
+**Status**: Waiting for Scaleway/Hetzner API keys
+
+---
+
 ### 🔮 Idee Future
 
 **1. Selective Backup**
