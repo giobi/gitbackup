@@ -51,6 +51,7 @@ def load_env():
 
 CREDS = load_env()
 BASE_URL = "https://api.scaleway.com/instance/v1/zones/fr-par-1"
+BLOCK_URL = "https://api.scaleway.com/block/v1/zones/fr-par-1"
 
 # Default VM config - Stardust
 VM_CONFIG = {
@@ -61,7 +62,7 @@ VM_CONFIG = {
 }
 
 
-def api_request(method, endpoint, data=None):
+def api_request(method, endpoint, data=None, base_url=None):
     """Make authenticated API request"""
     if not CREDS.get('SCALEWAY_SECRET_KEY'):
         print("❌ SCALEWAY_SECRET_KEY not found in .env")
@@ -72,7 +73,7 @@ def api_request(method, endpoint, data=None):
         "Content-Type": "application/json"
     }
 
-    url = f"{BASE_URL}/{endpoint}"
+    url = f"{base_url or BASE_URL}/{endpoint}"
 
     if method == "GET":
         r = requests.get(url, headers=headers)
@@ -138,8 +139,8 @@ def create_server(cloud_init_file=None):
     return server
 
 
-def destroy_server(server_id=None):
-    """Destroy server by ID or name"""
+def destroy_server(server_id=None, cleanup_volumes=True):
+    """Destroy server by ID or name, optionally cleanup orphan volumes"""
     if not server_id:
         # Find gitbackup-node
         data = api_request("GET", "servers")
@@ -152,6 +153,15 @@ def destroy_server(server_id=None):
         print("❌ No server found to destroy")
         return
 
+    # Get volume IDs before destroying
+    volume_ids = []
+    if cleanup_volumes:
+        server = api_request("GET", f"servers/{server_id}")
+        volumes = server.get("server", {}).get("volumes", {})
+        for vol in volumes.values():
+            if vol.get("volume_type") == "sbs_volume":
+                volume_ids.append(vol.get("id"))
+
     # First poweroff
     print(f"⏹️  Powering off server {server_id}...")
     try:
@@ -159,13 +169,36 @@ def destroy_server(server_id=None):
     except:
         pass  # May already be off
 
+    # Wait for poweroff to complete
+    import time
+    for i in range(30):  # Max 30 seconds
+        time.sleep(1)
+        data = api_request("GET", f"servers/{server_id}")
+        state = data.get("server", {}).get("state")
+        if state == "stopped":
+            break
+        print(f"   Waiting... ({state})")
+
     print(f"🗑️  Destroying server {server_id}...")
     api_request("DELETE", f"servers/{server_id}")
     print("✅ Server destroyed")
 
+    # Cleanup orphan SBS volumes
+    if cleanup_volumes and volume_ids:
+        import time
+        print("⏳ Waiting for volumes to detach...")
+        time.sleep(5)
+        for vol_id in volume_ids:
+            print(f"🗑️  Deleting orphan volume {vol_id}...")
+            try:
+                api_request("DELETE", f"volumes/{vol_id}", base_url=BLOCK_URL)
+                print(f"✅ Volume {vol_id} deleted")
+            except:
+                print(f"⚠️  Could not delete volume {vol_id} (may need manual cleanup)")
+
 
 def create_snapshot(server_id=None):
-    """Create snapshot of server"""
+    """Create snapshot of server volumes (supports both local and SBS volumes)"""
     if not server_id:
         # Find gitbackup-node
         data = api_request("GET", "servers")
@@ -189,12 +222,30 @@ def create_snapshot(server_id=None):
     # Snapshot each volume
     for vol_key, vol in volumes.items():
         vol_id = vol.get("id")
-        print(f"📸 Creating snapshot of volume {vol_id}...")
-        data = api_request("POST", "snapshots", {
-            "volume_id": vol_id,
-            "name": f"gitbackup-snapshot-{vol_key}"
-        })
-        print(f"✅ Snapshot created: {data.get('snapshot', {}).get('id')}")
+        vol_type = vol.get("volume_type", "l_ssd")  # l_ssd = local, sbs_volume = block storage
+
+        print(f"📸 Creating snapshot of volume {vol_id} (type: {vol_type})...")
+
+        if vol_type == "sbs_volume":
+            # Use Block Storage API for SBS volumes
+            snapshot_data = {
+                "volume_id": vol_id,
+                "name": f"gitbackup-snapshot-{vol_key}"
+            }
+            if CREDS.get('SCALEWAY_PROJECT_ID'):
+                snapshot_data['project_id'] = CREDS['SCALEWAY_PROJECT_ID']
+            data = api_request("POST", "snapshots", snapshot_data, base_url=BLOCK_URL)
+            print(f"✅ SBS Snapshot created: {data.get('snapshot', {}).get('id')}")
+        else:
+            # Use Instance API for local volumes
+            snapshot_data = {
+                "volume_id": vol_id,
+                "name": f"gitbackup-snapshot-{vol_key}"
+            }
+            if CREDS.get('SCALEWAY_PROJECT_ID'):
+                snapshot_data['project'] = CREDS['SCALEWAY_PROJECT_ID']
+            data = api_request("POST", "snapshots", snapshot_data)
+            print(f"✅ Local Snapshot created: {data.get('snapshot', {}).get('id')}")
 
 
 def main():
