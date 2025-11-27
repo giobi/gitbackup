@@ -55,7 +55,7 @@ BLOCK_URL = "https://api.scaleway.com/block/v1/zones/fr-par-1"
 
 # Default VM config - Stardust
 VM_CONFIG = {
-    "name": "gitbackup-node",
+    "name": "b1",  # Will be overridden by create_server(name=)
     "commercial_type": "STARDUST1-S",  # 1 vCPU, 1GB RAM, €1.80/mo
     "image": "ubuntu_jammy",  # Ubuntu 22.04
     "dynamic_ip_required": True,
@@ -107,9 +107,12 @@ def list_servers():
         print(f"{s['name']:<20} {s['state']:<12} {ip:<16} {s['commercial_type']:<15}")
 
 
-def create_server(cloud_init_file=None):
-    """Create new server"""
+def create_server(name=None, cloud_init_file=None):
+    """Create new server with optional custom name"""
     config = VM_CONFIG.copy()
+
+    if name:
+        config['name'] = name
 
     if CREDS.get('SCALEWAY_PROJECT_ID'):
         config['project'] = CREDS['SCALEWAY_PROJECT_ID']
@@ -259,8 +262,8 @@ def main():
     if cmd == "list":
         list_servers()
     elif cmd == "create":
-        cloud_init = sys.argv[2] if len(sys.argv) > 2 else None
-        create_server(cloud_init)
+        name = sys.argv[2] if len(sys.argv) > 2 else None
+        create_server(name=name)
     elif cmd == "destroy":
         server_id = sys.argv[2] if len(sys.argv) > 2 else None
         destroy_server(server_id)
